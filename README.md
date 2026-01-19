@@ -22,7 +22,13 @@ Create a `.env` file (or set environment variables):
 ```bash
 SHEET_ID=your_google_sheet_id
 SHEET_NAME=Sheet1
+
+# Option 1: Path to service account JSON file
 GOOGLE_SERVICE_ACCOUNT_JSON=/absolute/path/to/service-account.json
+
+# Option 2: Direct JSON credentials (useful for CI/CD or Docker)
+# GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"...","private_key":"..."}'
+
 CSV_PATH=/absolute/path/to/wallets.csv
 START_ROW=2
 HEADLESS=false
@@ -35,6 +41,9 @@ STAGEHAND_PROJECT_ID=your_stagehand_project_id_optional
 ```
 
 Notes:
+- `GOOGLE_SERVICE_ACCOUNT_JSON` accepts either a file path or the JSON credentials directly as a string
+  - Use a file path for local development (e.g., `./service-account.json`)
+  - Use direct JSON for environments where file paths differ (CI/CD, Docker, etc.)
 - If `CSV_PATH` is set, wallets are read from CSV and mapped to consecutive rows starting from `START_ROW`.
 - If `CSV_PATH` is not set, wallets are read from the sheet itself starting at `START_ROW`.
 - Rows with values already in both columns C and D are skipped (resume support).

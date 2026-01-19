@@ -35,18 +35,44 @@ const ensureConfig = () => {
   if (!CONFIG.sheetId) {
     throw new Error("SHEET_ID is required.");
   }
-  if (!CONFIG.serviceAccountJson || !fs.existsSync(CONFIG.serviceAccountJson)) {
+  if (!CONFIG.serviceAccountJson) {
     throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT_JSON must point to a valid service account JSON file.",
+      "GOOGLE_SERVICE_ACCOUNT_JSON is required. Set it to either:\n" +
+      "  1. A path to your service account JSON file, or\n" +
+      "  2. The JSON credentials directly as a string",
     );
   }
 };
 
 const getSheetsClient = async () => {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: CONFIG.serviceAccountJson,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
+  let authConfig;
+
+  // Check if it's a file path or direct JSON
+  if (fs.existsSync(CONFIG.serviceAccountJson)) {
+    // It's a file path
+    authConfig = {
+      keyFile: CONFIG.serviceAccountJson,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    };
+  } else {
+    // Try to parse as JSON string
+    try {
+      const credentials = JSON.parse(CONFIG.serviceAccountJson);
+      authConfig = {
+        credentials,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      };
+    } catch (error) {
+      throw new Error(
+        `GOOGLE_SERVICE_ACCOUNT_JSON must be either:\n` +
+        `  1. A valid file path (file not found at: ${CONFIG.serviceAccountJson}), or\n` +
+        `  2. Valid JSON credentials string (JSON parse failed: ${error.message})\n\n` +
+        `Please check your .env file and ensure the path exists or provide the JSON directly.`,
+      );
+    }
+  }
+
+  const auth = new google.auth.GoogleAuth(authConfig);
   const client = await auth.getClient();
   return google.sheets({ version: "v4", auth: client });
 };
