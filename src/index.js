@@ -129,8 +129,32 @@ const promptToContinue = async (message) => {
 };
 
 const detectVerification = async (page) => {
-  const text = await page.content();
-  return /verify you are human|captcha|cloudflare|security check/i.test(text);
+  // Check for actual verification challenges, not just the presence of Cloudflare
+  const title = await page.title();
+  const url = page.url();
+
+  // Check if we're on a Cloudflare challenge page
+  if (title.toLowerCase().includes('just a moment') ||
+      url.includes('challenge-platform')) {
+    return true;
+  }
+
+  // Check for visible captcha/verification elements
+  const verificationSelectors = [
+    'text=verify you are human',
+    'text=complete the security check',
+    '#challenge-form',
+    '.cf-challenge-running'
+  ];
+
+  for (const selector of verificationSelectors) {
+    const element = await page.locator(selector).first().count();
+    if (element > 0) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 const waitIfVerification = async (page, contextLabel) => {
@@ -140,30 +164,37 @@ const waitIfVerification = async (page, contextLabel) => {
 };
 
 const extractSolscanActivities = async (page) => {
-  await page.waitForTimeout(2000);
-  const text = await page.locator("text=/Total\\s+\\d+\\s+activities/i").first().textContent();
-  if (!text) {
-    throw new Error("Unable to locate Solscan activities text.");
+  // Wait for the activities tab to load
+  await page.waitForTimeout(3000);
+
+  // Try multiple approaches to find the activities count
+  // Approach 1: Look for text containing "activities" and extract the number
+  const textContent = await page.textContent('body');
+  const match = textContent.match(/Total\s+([\d,]+)\s+activities/i);
+
+  if (match) {
+    // Remove commas from the number
+    return match[1].replace(/,/g, '');
   }
-  const match = text.match(/Total\s+(\d+)\s+activities/i);
-  if (!match) {
-    throw new Error("Unable to parse Solscan activities count.");
-  }
-  return match[1];
+
+  throw new Error("Unable to locate Solscan activities count on page.");
 };
 
 const extractJupiterHoldingsPnl = async (page) => {
-  await page.waitForTimeout(2000);
-  const label = page.locator("text=/Holdings\s+PnL/i");
-  await label.first().waitFor({ timeout: CONFIG.timeoutMs });
-  const container = label.first().locator("..")
-    .locator("..")
-    .locator("..");
-  const valueText = await container.locator("text=/\$?[-+\d,.]+/i").first().textContent();
-  if (!valueText) {
-    throw new Error("Unable to locate Holdings PnL value.");
+  // Wait for page to load
+  await page.waitForTimeout(3000);
+
+  // Get all text content and search for Holdings PnL
+  const textContent = await page.textContent('body');
+
+  // Look for "Holdings PnL" followed by a dollar amount
+  const match = textContent.match(/Holdings\s+PnL[^\$]*\$?([-+]?[\d,]+\.?\d*)/i);
+
+  if (match) {
+    return match[1].trim();
   }
-  return valueText.trim();
+
+  throw new Error("Unable to locate Holdings PnL value on page.");
 };
 
 const withRetries = async (task, { label, attempts }) => {
