@@ -17,6 +17,12 @@ Automates Solscan activity counts and Jupiter Holdings PnL lookups using Playwri
 npm install
 ```
 
+If you see an npm error about a missing Stagehand version, run:
+
+```bash
+npm install @browserbasehq/stagehand@latest
+```
+
 Create a `.env` file (or set environment variables):
 
 ```bash
@@ -47,12 +53,7 @@ npm start
 
 ## CSV format
 
-The CSV should include a wallet column. Example headers:
-
-```csv
-wallet
-8GQHVGauEG8ccScLpafVh6xTDFU92SqXEpcc4oMAW9Qt
-```
+The CSV should include a wallet column.
 
 ## Behavior
 
