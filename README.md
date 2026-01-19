@@ -1,6 +1,6 @@
 # Codex Whale Search
 
-Automates Solscan activity counts and Jupiter Holdings PnL lookups using Playwright + Stagehand, then writes the results back to Google Sheets.
+Automates Solscan activity counts and Jupiter Holdings PnL lookups using Playwright, then writes the results back to Google Sheets.
 
 ## Requirements
 
@@ -29,15 +29,15 @@ GOOGLE_SERVICE_ACCOUNT_JSON=/absolute/path/to/service-account.json
 # Option 2: Direct JSON credentials (useful for CI/CD or Docker)
 # GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"...","private_key":"..."}'
 
-CSV_PATH=/absolute/path/to/wallets.csv
+# Optional: CSV file with wallet addresses (if not using, wallets will be read from the sheet)
+# CSV_PATH=/absolute/path/to/wallets.csv
+
 START_ROW=2
 HEADLESS=false
 RATE_LIMIT_MS=2000
 MAX_RETRIES=3
 TIMEOUT_MS=45000
 SCREENSHOT_DIR=screenshots
-STAGEHAND_API_KEY=your_stagehand_api_key_optional
-STAGEHAND_PROJECT_ID=your_stagehand_project_id_optional
 ```
 
 Notes:
@@ -69,4 +69,4 @@ wallet
 - Retries failures with exponential backoff.
 - Rate limits requests between wallets.
 - Captures a screenshot on failure in the `SCREENSHOT_DIR` folder.
-- If you provide `STAGEHAND_API_KEY`, Stagehand will run via Browserbase; otherwise it uses a local Playwright browser.
+- Uses Playwright with Chromium browser for web automation.

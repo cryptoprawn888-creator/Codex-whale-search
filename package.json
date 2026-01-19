@@ -3,12 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Playwright + Stagehand wallet activity and PnL scraper with Google Sheets integration",
+  "description": "Playwright wallet activity and PnL scraper with Google Sheets integration",
   "scripts": {
     "start": "node src/index.js"
   },
   "dependencies": {
-    "@browserbasehq/stagehand": "^2.5.0",
     "csv-parse": "^5.5.6",
     "dotenv": "^16.4.5",
     "googleapis": "^140.0.0",

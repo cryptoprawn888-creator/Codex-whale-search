@@ -4,7 +4,7 @@ import readline from "node:readline";
 import { parse } from "csv-parse/sync";
 import { google } from "googleapis";
 import dotenv from "dotenv";
-import { Stagehand } from "@browserbasehq/stagehand";
+import { chromium } from "playwright";
 
 dotenv.config();
 
@@ -19,8 +19,6 @@ const CONFIG = {
   maxRetries: Number.parseInt(process.env.MAX_RETRIES || "3", 10),
   timeoutMs: Number.parseInt(process.env.TIMEOUT_MS || "45000", 10),
   screenshotDir: process.env.SCREENSHOT_DIR || "screenshots",
-  stagehandApiKey: process.env.STAGEHAND_API_KEY,
-  stagehandProjectId: process.env.STAGEHAND_PROJECT_ID,
 };
 
 const log = (message, context = {}) => {
@@ -209,16 +207,9 @@ const run = async () => {
     return;
   }
 
-  const stagehand = new Stagehand({
-    env: {
-      headless: CONFIG.headless,
-      apiKey: CONFIG.stagehandApiKey,
-      projectId: CONFIG.stagehandProjectId,
-    },
-    local: !CONFIG.stagehandApiKey,
-  });
-  await stagehand.init();
-  const page = stagehand.page;
+  const browser = await chromium.launch({ headless: CONFIG.headless });
+  const context = await browser.newContext();
+  const page = await context.newPage();
   page.setDefaultTimeout(CONFIG.timeoutMs);
 
   for (const [index, walletEntry] of wallets.entries()) {
@@ -271,7 +262,7 @@ const run = async () => {
     await sleep(CONFIG.rateLimitMs);
   }
 
-  await stagehand.close();
+  await browser.close();
 };
 
 run().catch((error) => {
