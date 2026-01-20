@@ -167,16 +167,25 @@ const extractSolscanActivities = async (page) => {
   // Wait for the activities tab to load
   await page.waitForTimeout(3000);
 
-  // Try multiple approaches to find the activities count
-  // Approach 1: Look for text containing "activities" and extract the number
+  // Get all text content from the page
   const textContent = await page.textContent('body');
-  const match = textContent.match(/Total\s+([\d,]+)\s+activities/i);
 
-  if (match) {
-    // Remove commas from the number
-    return match[1].replace(/,/g, '');
+  // Try multiple patterns to find activities count
+  const patterns = [
+    /Total\s+([\d,]+)\s+activit(?:y|ies)/i,  // "Total X activity" or "Total X activities"
+    /Total\s+([\d,]+)\s+transfer(?:s)?/i,     // "Total X transfer" or "Total X transfers"
+    /More than\s+([\d,]+)\s+activit(?:y|ies)/i, // "More than X activities"
+  ];
+
+  for (const pattern of patterns) {
+    const match = textContent.match(pattern);
+    if (match) {
+      // Remove commas from the number and return
+      return match[1].replace(/,/g, '');
+    }
   }
 
+  // If we still can't find it, take a screenshot for debugging
   throw new Error("Unable to locate Solscan activities count on page.");
 };
 
