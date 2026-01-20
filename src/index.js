@@ -173,6 +173,14 @@ const extractSolscanActivities = async (page) => {
   // Clean up text - remove extra whitespace and normalize line breaks
   const cleanText = textContent.replace(/\s+/g, ' ').trim();
 
+  // Debug: Log a snippet of text containing "activit" to see what we're working with
+  const activityTextMatch = cleanText.match(/.{0,50}activit.{0,50}/i);
+  if (activityTextMatch) {
+    log("Found text containing 'activit':", { snippet: activityTextMatch[0] });
+  } else {
+    log("No text containing 'activit' found in page body");
+  }
+
   // Only look for ACTIVITIES, not transfers
   const patterns = [
     /Total\s+([\d,]+)\s+activit(?:y|ies)/i,      // "Total X activity" or "Total X activities"
