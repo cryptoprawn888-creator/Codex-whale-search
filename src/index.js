@@ -164,17 +164,22 @@ const waitIfVerification = async (page, contextLabel) => {
 };
 
 const extractSolscanActivities = async (page) => {
-  // Wait for the activities tab to load
-  await page.waitForTimeout(3000);
+  // Wait for network to be idle (page fully loaded)
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+    log("Network idle timeout, continuing anyway");
+  });
 
-  // Get all text content from the page
-  const textContent = await page.textContent('body');
+  // Additional wait for dynamic content
+  await page.waitForTimeout(5000);
+
+  // Get the rendered text using innerText (better for dynamic content)
+  const textContent = await page.evaluate(() => document.body.innerText);
 
   // Clean up text - remove extra whitespace and normalize line breaks
   const cleanText = textContent.replace(/\s+/g, ' ').trim();
 
   // Debug: Log a snippet of text containing "activit" to see what we're working with
-  const activityTextMatch = cleanText.match(/.{0,50}activit.{0,50}/i);
+  const activityTextMatch = cleanText.match(/.{0,80}activit.{0,80}/i);
   if (activityTextMatch) {
     log("Found text containing 'activit':", { snippet: activityTextMatch[0] });
   } else {
