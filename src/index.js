@@ -170,27 +170,33 @@ const extractSolscanActivities = async (page) => {
   // Get all text content from the page
   const textContent = await page.textContent('body');
 
+  // Clean up text - remove extra whitespace and normalize line breaks
+  const cleanText = textContent.replace(/\s+/g, ' ').trim();
+
   // Only look for ACTIVITIES, not transfers
   const patterns = [
     /Total\s+([\d,]+)\s+activit(?:y|ies)/i,      // "Total X activity" or "Total X activities"
-    /More than\s+([\d,]+)\s+activit(?:y|ies)/i,  // "More than X activities"
+    /More\s+than\s+([\d,]+)\s+activit(?:y|ies)/i,  // "More than X activities"
   ];
 
   for (const pattern of patterns) {
-    const match = textContent.match(pattern);
+    const match = cleanText.match(pattern);
     if (match) {
       // Remove commas from the number and return
-      return match[1].replace(/,/g, '');
+      const activityCount = match[1].replace(/,/g, '');
+      log(`Found activity count: ${activityCount}`, { pattern: pattern.source });
+      return activityCount;
     }
   }
 
   // Check if we can find "Total 0 activity" or similar indicating zero activities
-  if (/Total\s+0\s+activit(?:y|ies)/i.test(textContent)) {
+  if (/Total\s+0\s+activit(?:y|ies)/i.test(cleanText)) {
+    log("Found 0 activities explicitly stated");
     return '0';
   }
 
   // If no activities section found, check if the Activities tab exists but shows no data
-  // This happens when a wallet has no DeFi activities
+  // This happens when a wallet has no DeFi activities (only transfers)
   if (page.url().includes('#activities')) {
     // We're on the activities tab but found no activity count - likely means 0 activities
     log("No activities section found on page, assuming 0 activities");
