@@ -166,7 +166,7 @@ const waitIfVerification = async (page, contextLabel) => {
 const extractSolscanActivities = async (page) => {
   // Wait for network to be idle (page fully loaded)
   await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-    log("Network idle timeout, continuing anyway");
+    // Timeout is ok, continue anyway
   });
 
   // Additional wait for dynamic content
@@ -177,14 +177,6 @@ const extractSolscanActivities = async (page) => {
 
   // Clean up text - remove extra whitespace and normalize line breaks
   const cleanText = textContent.replace(/\s+/g, ' ').trim();
-
-  // Debug: Log a snippet of text containing "activit" to see what we're working with
-  const activityTextMatch = cleanText.match(/.{0,80}activit.{0,80}/i);
-  if (activityTextMatch) {
-    log("Found text containing 'activit':", { snippet: activityTextMatch[0] });
-  } else {
-    log("No text containing 'activit' found in page body");
-  }
 
   // Only look for ACTIVITIES, not transfers
   const patterns = [
@@ -197,14 +189,12 @@ const extractSolscanActivities = async (page) => {
     if (match) {
       // Remove commas from the number and return
       const activityCount = match[1].replace(/,/g, '');
-      log(`Found activity count: ${activityCount}`, { pattern: pattern.source });
       return activityCount;
     }
   }
 
   // Check if we can find "Total 0 activity" or similar indicating zero activities
   if (/Total\s+0\s+activit(?:y|ies)/i.test(cleanText)) {
-    log("Found 0 activities explicitly stated");
     return '0';
   }
 
@@ -212,7 +202,6 @@ const extractSolscanActivities = async (page) => {
   // This happens when a wallet has no DeFi activities (only transfers)
   if (page.url().includes('#activities')) {
     // We're on the activities tab but found no activity count - likely means 0 activities
-    log("No activities section found on page, assuming 0 activities");
     return '0';
   }
 
