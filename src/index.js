@@ -170,11 +170,10 @@ const extractSolscanActivities = async (page) => {
   // Get all text content from the page
   const textContent = await page.textContent('body');
 
-  // Try multiple patterns to find activities count
+  // Only look for ACTIVITIES, not transfers
   const patterns = [
-    /Total\s+([\d,]+)\s+activit(?:y|ies)/i,  // "Total X activity" or "Total X activities"
-    /Total\s+([\d,]+)\s+transfer(?:s)?/i,     // "Total X transfer" or "Total X transfers"
-    /More than\s+([\d,]+)\s+activit(?:y|ies)/i, // "More than X activities"
+    /Total\s+([\d,]+)\s+activit(?:y|ies)/i,      // "Total X activity" or "Total X activities"
+    /More than\s+([\d,]+)\s+activit(?:y|ies)/i,  // "More than X activities"
   ];
 
   for (const pattern of patterns) {
@@ -185,8 +184,20 @@ const extractSolscanActivities = async (page) => {
     }
   }
 
-  // If we still can't find it, take a screenshot for debugging
-  throw new Error("Unable to locate Solscan activities count on page.");
+  // Check if we can find "Total 0 activity" or similar indicating zero activities
+  if (/Total\s+0\s+activit(?:y|ies)/i.test(textContent)) {
+    return '0';
+  }
+
+  // If no activities section found, check if the Activities tab exists but shows no data
+  // This happens when a wallet has no DeFi activities
+  if (page.url().includes('#activities')) {
+    // We're on the activities tab but found no activity count - likely means 0 activities
+    log("No activities section found on page, assuming 0 activities");
+    return '0';
+  }
+
+  throw new Error("Unable to locate Solscan activities section on page.");
 };
 
 const extractJupiterHoldingsPnl = async (page) => {
