@@ -215,11 +215,17 @@ const extractJupiterHoldingsPnl = async (page) => {
   // Get all text content and search for Holdings PnL
   const textContent = await page.textContent('body');
 
-  // Look for "Holdings PnL" followed by a dollar amount
-  const match = textContent.match(/Holdings\s+PnL[^\$]*\$?([-+]?[\d,]+\.?\d*)/i);
+  // Look for "Holdings PnL" followed by a dollar amount (with optional negative sign before or after $)
+  // Handles: "-$17,267.85" or "$-17,267.85" or "$17,267.85"
+  const match = textContent.match(/Holdings\s+PnL[^\d\-]*(-?\$?[-]?[\d,]+\.?\d*)/i);
 
   if (match) {
-    return match[1].trim();
+    let value = match[1].trim();
+    // Remove $ sign if present, keep the negative sign
+    value = value.replace('$', '');
+    // Clean up any double negatives (e.g., "--123" -> "-123")
+    value = value.replace(/--/, '-');
+    return value;
   }
 
   throw new Error("Unable to locate Holdings PnL value on page.");
