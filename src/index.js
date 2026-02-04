@@ -193,31 +193,22 @@ const extractSolscanActivities = async (page) => {
     }
   }
 
-  // Check if we can find "Total 0 activity" or similar indicating zero activities
-  if (/Total\s+0\s+activit(?:y|ies)/i.test(cleanText)) {
-    return '0';
-  }
-
-  // If no activities section found, check if the Activities tab exists but shows no data
-  // This happens when a wallet has no DeFi activities (only transfers)
-  if (page.url().includes('#activities')) {
-    // We're on the activities tab but found no activity count - likely means 0 activities
-    return '0';
-  }
-
-  throw new Error("Unable to locate Solscan activities section on page.");
+  // No activity count found -- wallet has no DeFi activities (only transfers)
+  return '0';
 };
 
 const extractJupiterHoldingsPnl = async (page) => {
-  // Wait for page to load
-  await page.waitForTimeout(3000);
+  // Wait for network idle then extra time for React to render
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(5000);
 
-  // Get all text content and search for Holdings PnL
-  const textContent = await page.textContent('body');
+  // Use innerText to capture dynamically rendered content
+  const textContent = await page.evaluate(() => document.body.innerText);
+  const cleanText = textContent.replace(/\s+/g, ' ').trim();
 
   // Look for "Holdings PnL" followed by a dollar amount (with optional negative sign before or after $)
   // Handles: "-$17,267.85" or "$-17,267.85" or "$17,267.85"
-  const match = textContent.match(/Holdings\s+PnL[^\d\-]*(-?\$?[-]?[\d,]+\.?\d*)/i);
+  const match = cleanText.match(/Holdings\s+PnL[^\d\-]*(-?\$?[-]?[\d,]+\.?\d*)/i);
 
   if (match) {
     let value = match[1].trim();
@@ -273,61 +264,62 @@ const run = async () => {
   }
 
   const browser = await chromium.launch({ headless: CONFIG.headless });
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.setDefaultTimeout(CONFIG.timeoutMs);
+  try {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    page.setDefaultTimeout(CONFIG.timeoutMs);
 
-  for (const [index, walletEntry] of wallets.entries()) {
-    const rowIndex = walletEntry.rowIndex;
-    const wallet = walletEntry.wallet;
-    if (!wallet) {
-      log("Skipping empty wallet row", { rowIndex });
-      continue;
+    for (const [index, walletEntry] of wallets.entries()) {
+      const rowIndex = walletEntry.rowIndex;
+      const wallet = walletEntry.wallet;
+      if (!wallet) {
+        log("Skipping empty wallet row", { rowIndex });
+        continue;
+      }
+      if (walletEntry.activities && walletEntry.holdingsPnl) {
+        log("Skipping already processed row", { rowIndex, wallet });
+        continue;
+      }
+
+      log("Processing wallet", { index: index + 1, wallet, rowIndex });
+
+      try {
+        const activitiesValue = await withRetries(
+          async () => {
+            await page.goto(`https://solscan.io/account/${wallet}#activities`, {
+              waitUntil: "domcontentloaded",
+            });
+            await waitIfVerification(page, "Solscan");
+            return extractSolscanActivities(page);
+          },
+          { label: `solscan-${wallet}`, attempts: CONFIG.maxRetries },
+        );
+
+        await sleep(CONFIG.rateLimitMs);
+
+        const pnlValue = await withRetries(
+          async () => {
+            await page.goto(`https://jup.ag/portfolio/${wallet}`, {
+              waitUntil: "domcontentloaded",
+            });
+            await waitIfVerification(page, "Jupiter");
+            return extractJupiterHoldingsPnl(page);
+          },
+          { label: `jupiter-${wallet}`, attempts: CONFIG.maxRetries },
+        );
+
+        await writeSheetValues(sheets, rowIndex, activitiesValue, pnlValue);
+        log("Updated sheet row", { rowIndex, activitiesValue, pnlValue });
+      } catch (error) {
+        await captureFailureScreenshot(page, wallet, "failed");
+        log("Failed to process wallet, skipping", { wallet, rowIndex, error: error.message });
+      }
+
+      await sleep(CONFIG.rateLimitMs);
     }
-    if (walletEntry.activities && walletEntry.holdingsPnl) {
-      log("Skipping already processed row", { rowIndex, wallet });
-      continue;
-    }
-
-    log("Processing wallet", { index: index + 1, wallet, rowIndex });
-
-    const activitiesValue = await withRetries(
-      async () => {
-        await page.goto(`https://solscan.io/account/${wallet}#activities`, {
-          waitUntil: "domcontentloaded",
-        });
-        await waitIfVerification(page, "Solscan");
-        return extractSolscanActivities(page);
-      },
-      { label: `solscan-${wallet}`, attempts: CONFIG.maxRetries },
-    ).catch(async (error) => {
-      await captureFailureScreenshot(page, wallet, "solscan");
-      throw error;
-    });
-
-    await sleep(CONFIG.rateLimitMs);
-
-    const pnlValue = await withRetries(
-      async () => {
-        await page.goto(`https://jup.ag/portfolio/${wallet}`, {
-          waitUntil: "domcontentloaded",
-        });
-        await waitIfVerification(page, "Jupiter");
-        return extractJupiterHoldingsPnl(page);
-      },
-      { label: `jupiter-${wallet}`, attempts: CONFIG.maxRetries },
-    ).catch(async (error) => {
-      await captureFailureScreenshot(page, wallet, "jupiter");
-      throw error;
-    });
-
-    await writeSheetValues(sheets, rowIndex, activitiesValue, pnlValue);
-    log("Updated sheet row", { rowIndex, activitiesValue, pnlValue });
-
-    await sleep(CONFIG.rateLimitMs);
+  } finally {
+    await browser.close();
   }
-
-  await browser.close();
 };
 
 run().catch((error) => {
